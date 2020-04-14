@@ -46,7 +46,7 @@ bool SimulatedQuantizeRel(const Array<Type>& types,
 
   const auto* data = types[0].as<TensorTypeNode>();
   CHECK(data != nullptr);
-  CHECK_NE(data->shape.size(), 0) << "Input shape cannot be empty";
+//  CHECK_NE(data->shape.size(), 0) << "Input shape cannot be empty";  // [mbs] commented for nms
 
   reporter->Assign(types[1], TensorType({}, DataType::Float(32)));    // dom_scale
   reporter->Assign(types[2], TensorType({}, DataType::Float(32)));    // clip_min

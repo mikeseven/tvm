@@ -33,6 +33,8 @@ from .. import build_module as _build_module
 from ...contrib import graph_runtime
 from .kl_divergence import _find_scale_by_kl
 
+logger = logging.getLogger('quantize')
+
 
 def _get_profile_runtime(mod):
     func = mod['main']
@@ -77,7 +79,7 @@ def collect_stats(mod, dataset, chunk_by=-1):
     ret: Iterable[list of ndarray]
         List of output data of each layer, chunked by the chunk_by parameter
     """
-    logging.info("collecting statistics for calibration...")
+    logger.info("collecting statistics for calibration...")
     runtime = _get_profile_runtime(mod)
     num_outputs = runtime.get_num_outputs()
     chunk_by = num_outputs if chunk_by == -1 else chunk_by
@@ -97,7 +99,7 @@ def _kl_scale(mod, dataset):
     chunk_by = cfg.calibrate_chunk_by
     scales = []
     for samples in collect_stats(mod, dataset, chunk_by):
-        logging.info("finding threshold with kl for calibration...")
+        logger.info("finding threshold with kl for calibration...")
         with mp.Pool() as pool:
             scales += list(pool.map(_find_scale_by_kl, samples))
 

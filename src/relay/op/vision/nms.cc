@@ -35,6 +35,10 @@ bool GetValidCountRel(const Array<Type>& types,
                       const TypeReporter& reporter) {
   CHECK_EQ(types.size(), 2);
   const auto* data = types[0].as<TensorTypeNode>();
+//  CHECK(data != nullptr);
+//  CHECK_NE(data->shape.size(), 0) << "Input shape cannot be empty";
+  if(data==nullptr) // [mbs]
+    return false;
   const auto& dshape = data->shape;
   CHECK_EQ(dshape.size(), 3) << "Input data should be 3-D.";
 
@@ -84,11 +88,26 @@ bool NMSRel(const Array<Type>& types,
             const TypeReporter& reporter) {
   CHECK_EQ(types.size(), 3);
   const auto* data = types[0].as<TensorTypeNode>();
+//  CHECK(data != nullptr);
+//  CHECK_NE(data->shape.size(), 0) << "Input shape cannot be empty";
+  if(data==nullptr) // [mbs]
+    return false;
+
   const auto* valid_count = types[1].as<TensorTypeNode>();
+//  CHECK(valid_count != nullptr);
+//  CHECK_NE(valid_count->shape.size(), 0) << "Valid count shape cannot be empty";
+  if(valid_count==nullptr) // [mbs]
+    return false;
+
   const NonMaximumSuppressionAttrs* param =
     attrs.as<NonMaximumSuppressionAttrs>();
+//  CHECK(param != nullptr);
+  if(param==nullptr)  // [mbs]
+    return false;
+
   const auto& dshape = data->shape;
   const auto& vshape = valid_count->shape;
+  std::cout<<"[nms.NMSRel] dshape="<<dshape<<", vshape="<<vshape<<"\n"; // [mbs]
   CHECK_EQ(dshape.size(), 3) << "Input data should be 3-D.";
   CHECK_EQ(vshape.size(), 1) << "Input valid count should be 1-D.";
 

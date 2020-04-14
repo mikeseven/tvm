@@ -30,6 +30,8 @@ from .. import transform as _transform
 from .. import op as _op
 from .. import analysis
 
+logger = logging.getLogger('relay')
+
 
 class RequiredAttr(object):
     """Dummpy class to represent required attr"""
@@ -395,10 +397,10 @@ class AttrCvt(object):
                 raise NotImplementedError('Attribute %s in operator %s is not' +
                                           ' supported.', k, op_name)
             if k in self._disables:
-                logging.warning("Attribute %s is disabled in relay.sym.%s", k, op_name)
+                logger.warning("Attribute %s is disabled in relay.sym.%s", k, op_name)
             elif k in self._ignores:
                 if k != 'tvm_custom':
-                    logging.warning("Attribute %s is ignored in relay.sym.%s", k, op_name)
+                    logger.warning("Attribute %s is ignored in relay.sym.%s", k, op_name)
             elif k in self._transforms:
                 new_name, defaults, transform = self._parse_default(self._transforms[k])
                 if defaults is None:

@@ -2396,7 +2396,10 @@ def from_tflite(model, shape_dict, dtype_dict):
         import tflite.BuiltinOperator
     except ImportError:
         raise ImportError("The tflite package must be installed")
-    assert isinstance(model, tflite.Model.Model)
+    try:
+        assert isinstance(model, tflite.Model.Model)  # tflite 1.x
+    except AttributeError:
+        assert isinstance(model, tflite.Model)  # tflite 2.x
 
     # keep the same as tflite
     assert model.SubgraphsLength() == 1, "only support one subgraph (main subgraph)"
