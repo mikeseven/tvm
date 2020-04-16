@@ -18,32 +18,36 @@
  */
 
 /*!
- *
- * \file src/relay/transforms/print_ir.cc
- *
- * \brief Print the module IR to help debugging.
+ * \file util.cc
+ * \brief The utils for arithmetic analysis.
  */
-#include <tvm/relay/expr.h>
-#include <tvm/relay/transform.h>
+#include <tvm/arith/util.h>
+#include <dmlc/logging.h>
 
 namespace tvm {
-namespace relay {
+namespace arith {
 
-namespace transform {
+std::tuple<int64_t, int64_t, int64_t> xgcd(int64_t a, int64_t b) {
+  int64_t s = 0, old_s = 1;
+  int64_t t = 1, old_t = 0;
+  int64_t r = b, old_r = a;
 
-Pass PrintIR(bool show_meta_data) {
-  runtime::TypedPackedFunc<IRModule(IRModule, PassContext)> pass_func =
-    [=](IRModule m, PassContext pc) {
-      LOG(INFO) << "Dumping the module IR: " << std::endl << AsText(m, show_meta_data);
-      return m;
-  };
-  return CreateModulePass(pass_func, 0, "PrintIR", {});
+  while (r != 0) {
+    int64_t q = old_r / r;
+    std::swap(r, old_r);
+    r -= q * old_r;
+    std::swap(s, old_s);
+    s -= q * old_s;
+    std::swap(t, old_t);
+    t -= q * old_t;
+  }
+
+  CHECK_EQ(a % old_r, 0);
+  CHECK_EQ(b % old_r, 0);
+  CHECK(old_r == old_s*a + old_t*b);
+
+  return std::make_tuple(old_r, old_s, old_t);
 }
 
-TVM_REGISTER_GLOBAL("relay._transform.PrintIR")
-.set_body_typed(PrintIR);
-
-}  // namespace transform
-
-}  // namespace relay
+}  // namespace arith
 }  // namespace tvm
