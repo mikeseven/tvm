@@ -34,7 +34,7 @@ Now we are in tvm environment!
 ## Install required libraries
 Since Macs don't have Clang/LLVM with OpenMP, we install it
 ```shell
-conda install -y -c conda-forge llvmdev llvm-openmp llvm-tools clang clang-tools clangdev
+conda install -y -c conda-forge llvmdev llvm-openmp clangdev
 ```
 
 Install ANTLR parser for TensorFlow parsing
@@ -52,12 +52,12 @@ Install misc packages
 conda install -y -c conda-forge numpy decorator attrs tornado xgboost psutil cython
 ```
 
-Install glfw3
+Install glfw3 if you want to generate OpenGL/CUDA/Vulkan
 ```shell
 conda install -y -c menpo glfw3
 ```
 
-Not required by useful
+Not required by useful (python.app is required for matplotlib on Mac)
 ```shell
 conda install -y -c conda-forge matplotlib opencv py-opencv yaml yapf python.app h5py hdf5 cffi
 ```
@@ -90,6 +90,9 @@ cd ..
 make cython
 ```
 It takes about 10mn to build and 2s for cython.
+
+Notes:
+- for Ubuntu machines with NVidia GPU, use ```sima-ubuntu-config.cmake``` instead of sima-config.cmake.
 
 # Add TVM python paths to system-wide paths
 ```shell
