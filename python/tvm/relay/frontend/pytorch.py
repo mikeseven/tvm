@@ -132,11 +132,15 @@ def _elemwise(name):
         return get_relay_op(name)(data0, data1)
     return _impl
 
-def _abs():
+
+def _unary(name):
     def _impl(inputs, input_types):
-        data = inputs[0]
-        return _op.abs(data)
+        input_type = input_types[0]
+        data = _convert_elemwise_input(inputs[0], input_type)
+
+        return get_relay_op(name)(data)
     return _impl
+
 
 def _arange():
     def _impl(inputs, input_types):
@@ -348,11 +352,24 @@ def _ones():
             msg = "Data type %s could not be parsed in ones op" % (type(data))
             raise AssertionError(msg)
 
-        dtype_map = {6: "float32", 3: "int32"}
-        dtype_id = inputs[1]
-        assert dtype_id in dtype_map, "Unsupported dtype %d" % dtype_id
-        return _op.full(_expr.const(1), shape, dtype=dtype_map[dtype_id])
+        dtype = _convert_data_type(_convert_dtype_value(inputs[1]))
+
+        return _op.full(_expr.const(1), shape, dtype=dtype)
     return _impl
+
+def _ones_like():
+    def _impl(inputs, input_types):
+        data = inputs[0]
+        out = _op.ones_like(data)
+
+        # If the input and the output datatype is different, do a cast
+        dtype = _convert_data_type(_convert_dtype_value(inputs[1]))
+        if input_types[0] not in dtype:
+            out = _op.cast(out, dtype)
+
+        return out
+    return _impl
+
 
 def _zeros():
     def _impl(inputs, input_types):
@@ -369,11 +386,87 @@ def _zeros():
             msg = "Data type %s could not be parsed in zeros op" % (type(data))
             raise AssertionError(msg)
 
-        dtype_map = {6: "float32", 3: "int32"}
-        dtype_id = inputs[1]
-        assert dtype_id in dtype_map, "Unsupported dtype %d" % dtype_id
-        return _op.full(_expr.const(0), shape, dtype=dtype_map[dtype_id])
+        dtype = _convert_data_type(_convert_dtype_value(inputs[1]))
+
+        return _op.full(_expr.const(0), shape, dtype=dtype)
     return _impl
+
+
+def _zeros_like():
+    def _impl(inputs, input_types):
+        data = inputs[0]
+        out = _op.zeros_like(data)
+
+        # If the input and the output datatype is different, do a cast
+        dtype = _convert_data_type(_convert_dtype_value(inputs[1]))
+        if input_types[0] not in dtype:
+            out = _op.cast(out, dtype)
+
+        return out
+    return _impl
+
+
+def _full():
+    def _impl(inputs, input_types):
+        data = inputs[0]
+
+        fill_value = inputs[1]
+        import torch
+        if isinstance(data, _expr.Expr):
+            shape = _infer_shape(data)
+        elif isinstance(data, list):
+            shape = data
+        elif isinstance(data, (torch.Tensor, np.ndarray)):
+            shape = data.shape
+        else:
+            msg = "Data type %s could not be parsed in zeros op" % (type(data))
+            raise AssertionError(msg)
+
+        dtype = _convert_data_type(_convert_dtype_value(inputs[2]))
+
+        return _op.full(_expr.const(fill_value), shape, dtype=dtype)
+    return _impl
+
+def _full_like():
+    def _impl(inputs, input_types):
+        data = inputs[0]
+        fill_value = inputs[1]
+
+        out = _op.full_like(data, _expr.const(fill_value))
+
+        # If the input and the output datatype is different, do a cast
+        dtype = _convert_data_type(_convert_dtype_value(inputs[2]))
+        if input_types[0] not in dtype:
+            out = _op.cast(out, dtype)
+
+        return out
+    return _impl
+
+
+def _linspace():
+    def _impl(inputs, input_types):
+        start = inputs[0]
+        stop = inputs[1]
+        step = inputs[2]
+
+        # Find the spacing between values as step
+        if step != 1:
+            step = (stop - start) / (step - 1)
+            stop = stop + step
+        else:
+            stop = start + step
+
+        dtype = "float" if "float" in input_types[0:3] else _convert_dtype_value(inputs[3])
+        start = _create_typed_const(start, dtype)
+        stop = _create_typed_const(stop, dtype)
+        step = _create_typed_const(step, dtype)
+
+        return _op.transform.arange(start=start,
+                                    stop=stop,
+                                    step=step,
+                                    dtype=_convert_data_type(dtype))
+    return _impl
+
 
 def _relu():
     def _impl(inputs, input_types):
@@ -741,6 +834,26 @@ def _layer_norm():
                                  center=True,
                                  scale=True)
     return _impl
+
+
+def _group_norm():
+    def _impl(inputs, input_types):
+        data = inputs[0]
+        gamma = inputs[2]
+        beta = inputs[3]
+        num_groups = inputs[1]
+        epsilon = float(inputs[4])
+
+        return _op.nn.group_norm(data,
+                                 gamma=gamma,
+                                 beta=beta,
+                                 num_groups=num_groups,
+                                 axis=1,
+                                 epsilon=epsilon,
+                                 center=True,
+                                 scale=True)
+    return _impl
+
 
 def _transpose(prelude):
     def _impl(inputs, input_types):
@@ -1145,26 +1258,6 @@ def _pad():
         return _op.nn.pad(data, pad_width, pad_value)
     return _impl
 
-def _sqrt():
-    def _impl(inputs, input_types):
-        data = inputs[0]
-        return _op.tensor.sqrt(data)
-    return _impl
-
-
-def _rsqrt():
-    def _impl(inputs, input_types):
-        data = inputs[0]
-        return _op.tensor.rsqrt(data)
-    return _impl
-
-
-def _ceil():
-    def _impl(inputs, input_types):
-        data = inputs[0]
-        return _op.ceil(data)
-    return _impl
-
 
 def _clamp():
     def _impl(inputs, input_types):
@@ -1172,20 +1265,6 @@ def _clamp():
         amin = inputs[1] if inputs[1] else np.finfo(np.float32).min
         amax = inputs[2] if inputs[2] else np.finfo(np.float32).max
         return _op.clip(data, amin, amax)
-    return _impl
-
-
-def _floor():
-    def _impl(inputs, input_types):
-        data = inputs[0]
-        return _op.floor(data)
-    return _impl
-
-
-def _round():
-    def _impl(inputs, input_types):
-        data = inputs[0]
-        return _op.round(data)
     return _impl
 
 
@@ -1266,17 +1345,6 @@ def _expand_as():
         return inputs[0]
     return _impl
 
-def _neg():
-    def _impl(inputs, input_types):
-        data = inputs[0]
-        return _op.tensor.negative(data)
-    return _impl
-
-def _tanh():
-    def _impl(inputs, input_types):
-        data = inputs[0]
-        return _op.tensor.tanh(data)
-    return _impl
 
 def _Bool():
     def _impl(inputs, input_types):
@@ -1355,18 +1423,6 @@ def _logical_xor():
         rhs = _op.cast(rhs, "bool")
 
         return _op.logical_xor(lhs, rhs)
-    return _impl
-
-
-def _isfinite():
-    def _impl(inputs, input_types):
-        return _op.isfinite(inputs[0])
-    return _impl
-
-
-def _isnan():
-    def _impl(inputs, input_types):
-        return _op.isnan(inputs[0])
     return _impl
 
 
@@ -1492,12 +1548,16 @@ def _get_convert_map(prelude):
         "aten::mul"                             : _elemwise("multiply"),
         "aten::mul_"                            : _elemwise("multiply"),
         "aten::pow"                             : _elemwise("power"),
-        "aten::abs"                             : _abs(),
         "aten::arange"                          : _arange(),
         "aten::div"                             : _elemwise("divide"),
         "aten::div_"                            : _elemwise("divide"),
         "aten::ones"                            : _ones(),
+        "aten::ones_like"                       : _ones_like(),
         "aten::zeros"                           : _zeros(),
+        "aten::zeros_like"                      : _zeros_like(),
+        "aten::full"                            : _full(),
+        "aten::full_like"                       : _full_like(),
+        "aten::linspace"                        : _linspace(),
         "aten::reciprocal"                      : _reciprocal(),
         "aten::repeat"                          : _repeat(),
         "aten::repeat_interleave"               : _repeat_interleave(),
@@ -1536,6 +1596,7 @@ def _get_convert_map(prelude):
         "aten::batch_norm"                      : _batch_norm(),
         "aten::instance_norm"                   : _instance_norm(),
         "aten::layer_norm"                      : _layer_norm(),
+        "aten::group_norm"                      : _group_norm(),
         "aten::transpose"                       : _transpose(prelude),
         "aten::transpose_"                      : _transpose(prelude),
         "aten::t"                               : _transpose(prelude),
@@ -1568,12 +1629,26 @@ def _get_convert_map(prelude):
         "aten::argmax"                          : _reduce("argmax"),
         "aten::std"                             : _std(),
         "aten::var"                             : _variance(),
-        "aten::sqrt"                            : _sqrt(),
-        "aten::rsqrt"                           : _rsqrt(),
-        "aten::ceil"                            : _ceil(),
+        "aten::abs"                             : _unary("abs"),
+        "aten::neg"                             : _unary("negative"),
+        "aten::cos"                             : _unary("cos"),
+        "aten::sin"                             : _unary("sin"),
+        "aten::tan"                             : _unary("tan"),
+        "aten::tanh"                            : _unary("tanh"),
+        "aten::atan"                            : _unary("atan"),
+        "aten::log"                             : _unary("log"),
+        "aten::exp"                             : _unary("exp"),
+        "aten::erf"                             : _unary("erf"),
+        "aten::trunc"                           : _unary("trunc"),
+        "aten::sign"                            : _unary("sign"),
+        "aten::sqrt"                            : _unary("sqrt"),
+        "aten::rsqrt"                           : _unary("rsqrt"),
+        "aten::ceil"                            : _unary("ceil"),
+        "aten::floor"                           : _unary("floor"),
+        "aten::round"                           : _unary("round"),
+        "aten::isfinite"                        : _unary("isfinite"),
+        "aten::isnan"                           : _unary("isnan"),
         "aten::clamp"                           : _clamp(),
-        "aten::floor"                           : _floor(),
-        "aten::round"                           : _round(),
         "aten::detach"                          : _identity(),
         "aten::upsample_bilinear2d"             : _upsample("bilinear"),
         "aten::upsample_nearest2d"              : _upsample("nearest_neighbor"),
@@ -1588,12 +1663,8 @@ def _get_convert_map(prelude):
         "aten::logical_xor"                     : _logical_xor(),
         "aten::bitwise_not"                     : _bitwise_not(),
         "aten::bitwise_xor"                     : _bitwise_xor(),
-        "aten::isfinite"                        : _isfinite(),
-        "aten::isnan"                           : _isnan(),
         "aten::Bool"                            : _Bool(),
         "aten::Float"                           : _Float(),
-        "aten::neg"                             : _neg(),
-        "aten::tanh"                            : _tanh(),
         "aten::adaptive_avg_pool3d"             : _adaptive_avg_pool_3d(),
         "aten::adaptive_max_pool3d"             : _adaptive_max_pool_3d(),
         "aten::mm"                              : _matmul(),

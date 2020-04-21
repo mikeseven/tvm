@@ -31,10 +31,11 @@
 namespace tvm {
 namespace tir {
 
-void BinderAddAssert(PrimExpr cond,
+void BinderAddAssert(arith::Analyzer* ana,
+                     PrimExpr cond,
                      const std::string& arg_name,
                      std::vector<Stmt>* asserts) {
-  PrimExpr scond = Simplify(cond);
+  PrimExpr scond = ana->Simplify(cond);
   if (is_zero(scond)) {
     LOG(FATAL) << "Bind have an unmet assertion: "
                << cond << ", " << " on argument " << arg_name;
@@ -65,10 +66,10 @@ bool ArgBinder::Bind_(const PrimExpr& arg,
       }
       return true;
     } else {
-      BinderAddAssert(it->second == value, arg_name, &asserts_);
+      BinderAddAssert(&analyzer_, it->second == value, arg_name, &asserts_);
     }
   } else {
-    BinderAddAssert(arg == value, arg_name, &asserts_);
+    BinderAddAssert(&analyzer_, arg == value, arg_name, &asserts_);
   }
   return false;
 }
@@ -121,7 +122,8 @@ void ArgBinder::BindBuffer(const Buffer& arg,
       PrimExpr offset = value->elem_offset;
       PrimExpr factor = make_const(offset.dtype(), arg->offset_factor);
       PrimExpr zero = make_zero(offset.dtype());
-      BinderAddAssert(truncmod(offset, factor) == zero,
+      BinderAddAssert(&analyzer_,
+                      truncmod(offset, factor) == zero,
                       arg_name + ".elem_offset", &asserts_);
     }
   }
@@ -130,7 +132,7 @@ void ArgBinder::BindBuffer(const Buffer& arg,
     CHECK(fuzzy_match) << "Argument " << arg_name << " size mismatch";
     size_t diff = value->shape.size() - arg->shape.size();
     for (size_t i = 0; i < diff; ++i) {
-      CHECK(is_one(Simplify(value->shape[i])))
+      CHECK(is_one(analyzer_.Simplify(value->shape[i])))
           << "Argument " << arg_name << " shape mismatch"
           << arg->shape << " vs " << value->shape;
     }
@@ -269,7 +271,7 @@ void ArgBinder::BindDLTensor(const Buffer& buffer,
       value = tvm::if_then_else(is_null, stride, value);
       value = tvm::if_then_else(buffer->shape[k] == 1, 0, value);
       Bind_(buffer->strides[k], value, field_name.str(), true);
-      stride = Simplify(stride * buffer->shape[k]);
+      stride = analyzer_.Simplify(stride * buffer->shape[k]);
     }
   } else {
     std::ostringstream stride_null_err_msg;
@@ -289,9 +291,9 @@ void ArgBinder::BindDLTensor(const Buffer& buffer,
   }
   // Byte_offset field.
   int data_bytes = GetVectorBytes(buffer->dtype);
-  int64_t const_offset;
-  if (arith::GetConst(buffer->elem_offset, &const_offset)) {
-    Bind_(make_const(DataType::UInt(64), const_offset * data_bytes),
+
+  if (const auto* const_offset = buffer->elem_offset.as<IntImmNode>()) {
+    Bind_(make_const(DataType::UInt(64), const_offset->value * data_bytes),
                TVMArrayGet(DataType::UInt(64), handle, intrinsic::kArrByteOffset),
           arg_name + ".byte_offset", true);
   } else {
@@ -304,7 +306,9 @@ void ArgBinder::BindDLTensor(const Buffer& buffer,
         PrimExpr offset = buffer->elem_offset;
         PrimExpr factor = make_const(offset.dtype(), buffer->offset_factor);
         PrimExpr zero = make_zero(offset.dtype());
-        BinderAddAssert(truncmod(offset, factor) == zero, arg_name + ".elem_offset", &asserts_);
+        BinderAddAssert(&analyzer_,
+                        truncmod(offset, factor) == zero,
+                        arg_name + ".elem_offset", &asserts_);
       }
     }
   }

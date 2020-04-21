@@ -717,6 +717,28 @@ def test_forward_layernorm():
         init_weight(ln.eval())
         verify_model(ln.eval(), input_data=inp)
 
+
+def test_forward_groupnorm():
+    input_shape = [10, 6, 5, 5]
+    input_data = torch.rand(input_shape).float()
+
+    # Separate 6 channels into 3 groups
+    verify_model(torch.nn.GroupNorm(3, 6).eval(), input_data=input_data)
+
+    # Put all 6 channels into a single group (equivalent with LayerNorm)
+    verify_model(torch.nn.GroupNorm(1, 6).eval(), input_data=input_data)
+
+    # Separate 6 channels into 6 groups (equivalent with InstanceNorm)
+    verify_model(torch.nn.GroupNorm(6, 6).eval(), input_data=input_data)
+
+    input_shape = [1, 10, 4, 7]
+    input_data = torch.rand(input_shape).float()
+    verify_model(torch.nn.GroupNorm(1, 10).eval(), input_data=input_data)
+    verify_model(torch.nn.GroupNorm(2, 10).eval(), input_data=input_data)
+    verify_model(torch.nn.GroupNorm(5, 10).eval(), input_data=input_data)
+    verify_model(torch.nn.GroupNorm(10, 10).eval(), input_data=input_data)
+
+
 def test_forward_reshape():
     torch.set_grad_enabled(False)
     input_shape = [2, 1, 10, 1, 10]
@@ -1475,30 +1497,6 @@ def test_forward_isinf():
     verify_model(IsInf1().float().eval(), input_data=input_data)
 
 
-def test_forward_rsqrt():
-    torch.set_grad_enabled(False)
-    input_shape = [1, 3, 10, 10]
-
-    class Rsqrt1(Module):
-        def forward(self, *args):
-            return torch.rsqrt(args[0])
-
-    input_data = torch.rand(input_shape).float()
-    verify_model(Rsqrt1().float().eval(), input_data=input_data)
-
-
-def test_forward_ceil():
-    torch.set_grad_enabled(False)
-    input_shape = [1, 3, 10, 10]
-
-    class Ceil1(Module):
-        def forward(self, *args):
-            return torch.ceil(args[0])
-
-    input_data = torch.rand(input_shape).float()
-    verify_model(Ceil1().float().eval(), input_data=input_data)
-
-
 def test_forward_clamp():
     torch.set_grad_enabled(False)
     input_shape = [1, 3, 10, 10]
@@ -1521,28 +1519,142 @@ def test_forward_clamp():
     verify_model(Clamp3().float().eval(), input_data=input_data)
 
 
-def test_forward_floor():
+def test_forward_ones():
+    torch.set_grad_enabled(False)
+
+    class Ones1(Module):
+        def forward(self, *args):
+            return torch.ones(2,3)
+
+    verify_model(Ones1().float().eval(), input_data=[])
+
+
+def test_forward_ones_like():
     torch.set_grad_enabled(False)
     input_shape = [1, 3, 10, 10]
 
-    class Floor1(Module):
+    class OnesLike1(Module):
         def forward(self, *args):
-            return torch.floor(args[0])
+            return torch.ones_like(args[0])
+
+    class OnesLike2(Module):
+        def forward(self, *args):
+            return torch.ones_like(args[0], dtype=torch.int8)
+
+    class OnesLike3(Module):
+        def forward(self, *args):
+            return torch.ones_like(args[0], dtype=torch.float)
 
     input_data = torch.rand(input_shape).float()
-    verify_model(Floor1().float().eval(), input_data=input_data)
+    verify_model(OnesLike1().float().eval(), input_data=input_data)
+    verify_model(OnesLike2().float().eval(), input_data=input_data)
+    verify_model(OnesLike3().float().eval(), input_data=input_data)
 
 
-def test_forward_round():
+def test_forward_zeros():
+    torch.set_grad_enabled(False)
+
+    class Zeros1(Module):
+        def forward(self, *args):
+            return torch.zeros(2,3)
+
+    verify_model(Zeros1().float().eval(), input_data=[])
+
+
+def test_forward_zeros_like():
     torch.set_grad_enabled(False)
     input_shape = [1, 3, 10, 10]
 
-    class Round1(Module):
+    class ZerosLike1(Module):
         def forward(self, *args):
-            return torch.round(args[0])
+            return torch.zeros_like(args[0])
+
+    class ZerosLike2(Module):
+        def forward(self, *args):
+            return torch.zeros_like(args[0], dtype=torch.int32)
+
+    class ZerosLike3(Module):
+        def forward(self, *args):
+            return torch.zeros_like(args[0], dtype=torch.float)
 
     input_data = torch.rand(input_shape).float()
-    verify_model(Round1().float().eval(), input_data=input_data)
+    verify_model(ZerosLike1().float().eval(), input_data=input_data)
+    verify_model(ZerosLike2().float().eval(), input_data=input_data)
+    verify_model(ZerosLike3().float().eval(), input_data=input_data)
+
+
+def test_forward_full():
+    torch.set_grad_enabled(False)
+
+    class Full1(Module):
+        def forward(self, *args):
+            return torch.full((2,3), 3.14)
+
+    class Full2(Module):
+        def forward(self, *args):
+            return torch.full((1, 2,3), 1.0, dtype=torch.int32)
+
+    verify_model(Full1().float().eval(), input_data=[])
+    verify_model(Full2().float().eval(), input_data=[])
+
+
+def test_forward_full_like():
+    torch.set_grad_enabled(False)
+    input_shape = [1, 3, 10, 10]
+
+    class FullLike1(Module):
+        def forward(self, *args):
+            return torch.full_like(args[0], 3.14)
+
+    class FullLike2(Module):
+        def forward(self, *args):
+            return torch.full_like(args[0], 22.22, dtype=torch.int32)
+
+    class FullLike3(Module):
+        def forward(self, *args):
+            return torch.full_like(args[0], 1.4, dtype=torch.float)
+
+    input_data = torch.rand(input_shape).float()
+    verify_model(FullLike1().float().eval(), input_data=input_data)
+    verify_model(FullLike2().float().eval(), input_data=input_data)
+    verify_model(FullLike3().float().eval(), input_data=input_data)
+
+def test_forward_linspace():
+    torch.set_grad_enabled(False)
+
+    class Linspace1(Module):
+        def forward(self, *args):
+            return torch.linspace(5, 10)
+    class Linspace2(Module):
+        def forward(self, *args):
+            return torch.linspace(-10, 10, steps=5)
+    class Linspace3(Module):
+        def forward(self, *args):
+            return torch.linspace(start=-10, end=10, steps=5)
+    class Linspace4(Module):
+        def forward(self, *args):
+            return torch.linspace(start=-10, end=10, steps=1)
+    class Linspace5(Module):
+        def forward(self, *args):
+            return torch.linspace(1, 2, 1, dtype=torch.int32)
+    class Linspace6(Module):
+        def forward(self, *args):
+            return torch.linspace(start=1, end=6, steps=2)
+    class Linspace7(Module):
+        def forward(self, *args):
+            return torch.linspace(1, 4, dtype=torch.float32)
+    class Linspace8(Module):
+        def forward(self, *args):
+            return torch.linspace(1, 2, 1, dtype=torch.int16)
+
+    verify_model(Linspace1().float().eval())
+    verify_model(Linspace2().float().eval())
+    verify_model(Linspace3().float().eval())
+    verify_model(Linspace4().float().eval())
+    verify_model(Linspace5().float().eval())
+    verify_model(Linspace6().float().eval())
+    verify_model(Linspace7().float().eval())
+    verify_model(Linspace8().float().eval())
 
 
 def test_forward_take():
@@ -1689,6 +1801,93 @@ def test_forward_logical_xor():
     verify_model(LogicalXor2().float().eval(), input_data=[lhs])
 
 
+def test_forward_unary():
+    torch.set_grad_enabled(False)
+
+    class Sqrt1(Module):
+        def forward(self, *args):
+            return torch.sqrt(args[0])
+
+    class RSqrt1(Module):
+        def forward(self, *args):
+            return torch.rsqrt(args[0])
+
+    class Ceil1(Module):
+        def forward(self, *args):
+            return torch.ceil(args[0])
+
+    class Floor1(Module):
+        def forward(self, *args):
+            return torch.floor(args[0])
+
+    class Round1(Module):
+        def forward(self, *args):
+            return torch.round(args[0])
+
+    class Cos1(Module):
+        def forward(self, *args):
+            return torch.cos(args[0])
+
+    class Sin1(Module):
+        def forward(self, *args):
+            return torch.sin(args[0])
+
+    class Tan1(Module):
+        def forward(self, *args):
+            return torch.tan(args[0])
+
+    class Tanh1(Module):
+        def forward(self, *args):
+            return torch.tanh(args[0])
+
+    class ATanh1(Module):
+        def forward(self, *args):
+            return torch.atan(args[0])
+
+    class Log1(Module):
+        def forward(self, *args):
+            return torch.log(args[0])
+
+    class Exp1(Module):
+        def forward(self, *args):
+            return torch.exp(args[0])
+
+    class Erf1(Module):
+        def forward(self, *args):
+            return torch.erf(args[0])
+
+    class Trunc1(Module):
+        def forward(self, *args):
+            return torch.trunc(args[0])
+
+    class Sign1(Module):
+        def forward(self, *args):
+            return torch.sign(args[0])
+
+    class Neg1(Module):
+        def forward(self, *args):
+            return torch.neg(args[0])
+
+    input_shape = [1, 3, 10, 10]
+    input_data = torch.rand(input_shape).float()
+    verify_model(Sqrt1().float().eval(), input_data=input_data)
+    verify_model(RSqrt1().float().eval(), input_data=input_data)
+    verify_model(Ceil1().float().eval(), input_data=input_data)
+    verify_model(Floor1().float().eval(), input_data=input_data)
+    verify_model(Round1().float().eval(), input_data=input_data)
+    verify_model(Cos1().float().eval(), input_data=input_data)
+    verify_model(Sin1().float().eval(), input_data=input_data)
+    verify_model(Tan1().float().eval(), input_data=input_data)
+    verify_model(Tanh1().float().eval(), input_data=input_data)
+    verify_model(ATanh1().float().eval(), input_data=input_data)
+    verify_model(Log1().float().eval(), input_data=input_data)
+    verify_model(Exp1().float().eval(), input_data=input_data)
+    verify_model(Erf1().float().eval(), input_data=input_data)
+    verify_model(Trunc1().float().eval(), input_data=input_data)
+    verify_model(Sign1().float().eval(), input_data=input_data)
+    verify_model(Neg1().float().eval(), input_data=input_data)
+
+
 if __name__ == "__main__":
     # Single operator tests
     test_forward_add()
@@ -1727,6 +1926,7 @@ if __name__ == "__main__":
     test_forward_batchnorm()
     test_forward_instancenorm()
     test_forward_layernorm()
+    test_forward_groupnorm()
     test_forward_transpose()
     test_forward_size()
     test_forward_view()
@@ -1746,12 +1946,8 @@ if __name__ == "__main__":
     test_forward_mean()
     test_forward_expand()
     test_forward_pow()
-    test_forward_abs()
-    test_forward_rsqrt()
-    test_forward_ceil()
+    test_forward_unary()
     test_forward_clamp()
-    test_forward_floor()
-    test_forward_round()
     test_forward_logical_not()
     test_forward_bitwise_not()
     test_forward_bitwise_xor()
@@ -1759,6 +1955,13 @@ if __name__ == "__main__":
     test_forward_isfinite()
     test_forward_isnan()
     test_forward_isinf()
+    test_forward_ones()
+    test_forward_ones_like()
+    test_forward_zeros()
+    test_forward_zeros_like()
+    test_forward_full()
+    test_forward_full_like()
+    test_forward_linspace()
     test_forward_arange()
     test_forward_chunk()
     test_forward_split()
