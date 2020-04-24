@@ -1,3 +1,4 @@
+#!/bin/bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -14,34 +15,9 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import tvm
-from tvm import te
 
-
-
-def test_verify_ssa():
-    x = te.var('x')
-    y = te.var()
-    z = tvm.tir.Evaluate(x + y)
-    assert(tvm.tir.ir_pass.VerifySSA(z))
-
-
-def test_convert_ssa():
-    x = te.var('x')
-    y = te.var()
-    let1 = tvm.tir.Let(x, 1, x + 1)
-    let2 = tvm.tir.Let(x, 1, x + y)
-    z = tvm.tir.Evaluate(let1 + let2)
-    assert(not tvm.tir.ir_pass.VerifySSA(z))
-    z_ssa = tvm.tir.ir_pass.ConvertSSA(z)
-    assert(tvm.tir.ir_pass.VerifySSA(z_ssa))
-
-
-def test_expr_use_var():
-    x = te.var('x')
-    assert(tvm.tir.ir_pass.ExprUseVar(x+1, x))
-    assert(not tvm.tir.ir_pass.ExprUseVar(1+10, x))
-
-
-if __name__ == "__main__":
-    test_expr_use_var()
+set -u
+set -e
+export TVM_PATH=`pwd`
+export PYTHONPATH=${TVM_PATH}/python:${TVM_PATH}/topi/python
+export PYTEST_ADDOPTS="-v $CI_PYTEST_ADD_OPTIONS"

@@ -14,15 +14,19 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""Namespace of IR pass functions.
+import tvm
+from tvm import te
 
-This namespace is used for developers. While you do not see any declarations.
-The functions are automatically exported from C++ side via PackedFunc.
+def test_verify_ssa():
+    x = te.var('x')
+    y = te.var()
+    z = tvm.tir.Evaluate(x + y)
+    assert(tvm.tir.analysis.verify_ssa(
+        tvm.tir.PrimFunc([x, y],z)))
 
-Each api is a PackedFunc that can be called in a positional argument manner.
-You can read "include/tvm/tir/ir_pass.h" for the function signature and
-"src/api/api_pass.cc" for the PackedFunc's body of these functions.
-"""
-import tvm._ffi
+    assert(not tvm.tir.analysis.verify_ssa(
+        tvm.tir.PrimFunc([x, y], tvm.tir.LetStmt(x, 1, z))))
 
-tvm._ffi._init_api("tvm.ir_pass", __name__)
+
+if __name__ == "__main__":
+    test_verify_ssa()

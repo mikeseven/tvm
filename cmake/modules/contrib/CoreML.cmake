@@ -14,29 +14,12 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import tvm
-from tvm import te
 
-def test_decorate_device():
-    m = te.size_var('m')
-    l = te.size_var('l')
-    A = te.placeholder((m, l), name='A')
-
-    A1 = te.compute((m, l), lambda i, j: A[i, j], name='A1')
-    A2 = te.compute((m, l), lambda i, j: A1[i, j] + 3, name='A2')
-
-    s = te.create_schedule(A2.op)
-    xo, xi = s[A2].split(A2.op.axis[0], factor=8)
-    s[A1].compute_at(s[A2], xo)
-    s[A1].set_scope("shared")
-
-    bounds = tvm.te.schedule.InferBound(s)
-    stmt1 = tvm.te.schedule.ScheduleOps(s, bounds)
-    stmt2 = tvm.tir.ir_pass.DecorateDeviceScope(stmt1)
-    assert isinstance(stmt2, tvm.tir.AttrStmt)
-    assert stmt2.attr_key == "device_scope"
-    assert stmt1 == stmt2.body
-
-if __name__ == "__main__":
-    test_decorate_device()
-
+if(USE_COREML)
+  message(STATUS "Build with contrib.coreml")
+  find_library(FOUNDATION_LIB Foundation)
+  find_library(COREML_LIB Coreml)
+  file(GLOB COREML_CONTRIB_SRC src/runtime/contrib/coreml/*.mm)
+  list(APPEND TVM_RUNTIME_LINKER_LIBS ${FOUNDATION_LIB} ${COREML_LIB})
+  list(APPEND RUNTIME_SRCS ${COREML_CONTRIB_SRC})
+endif(USE_COREML)
