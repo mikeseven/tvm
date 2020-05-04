@@ -150,7 +150,7 @@ def get_package_data_files():
     return ['relay/std/prelude.rly', 'relay/std/core.rly']
 
 
-setup(name='tvm',
+setup(name='sima-tvm',
       version=__version__,
       description="TVM: An End to End Tensor IR/DSL Stack for Deep Learning Systems",
       zip_safe=False,
@@ -160,6 +160,7 @@ setup(name='tvm',
         'decorator',
         'attrs',
         'psutil',
+        'sima-mlc'
         ],
       extras_require={'test': ['pillow<7',
                                'matplotlib'],
