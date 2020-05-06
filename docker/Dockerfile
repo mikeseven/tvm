@@ -3,7 +3,7 @@ FROM simaai/ubuntu:latest
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get -y install \
     build-essential ccache \
-    wget curl awscli cmake unzip && \
+    wget curl awscli cmake unzip git && \
     rm -rf /var/lib/apt/lists/*
 RUN \
   sed -i 's/# \(.*multiverse$\)/\1/g' /etc/apt/sources.list && \
@@ -20,16 +20,6 @@ RUN \
   curl https://letsencrypt.org/certs/lets-encrypt-x3-cross-signed.pem.txt  \
     -o /usr/local/share/ca-certificates/letsencryptx3.crt && \
   update-ca-certificates
-
-ARG MLA_BRANCH="master"
-ARG MLA_VERSION="0.0.1"
-ADD mla-${MLA_VERSION}-Linux.deb /tmp
-RUN apt-get update && apt-get install -y /tmp/mla-${MLA_VERSION}-Linux.deb && rm -rf /var/lib/apt/lists/*
-
-ARG N2A_COMPILER_BRANCH="master"
-ARG N2A_COMPILER_VERSION="0.0.1"
-ADD sima_mlc-${N2A_COMPILER_VERSION}_${N2A_COMPILER_BRANCH}-py3-none-any.whl /tmp
-RUN pip3 install /tmp/sima_mlc-${N2A_COMPILER_VERSION}_${N2A_COMPILER_BRANCH}-py3-none-any.whl
 
 RUN apt-get update && \
   apt-get install -y \

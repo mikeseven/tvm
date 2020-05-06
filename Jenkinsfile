@@ -3,12 +3,14 @@ library('sima-jenkins-lib')
 
 def main() {
   def job_name = env.JOB_NAME.split('/')[1]
-  def currentBranchName = env.CHANGE_ID ? env.CHANGE_BRANCH : env.BRANCH_NAME
 
   properties([
       parameters([
-          string(name: "COPY_MLA_BRANCH_PKG", defaultValue: currentBranchName, description: 'Copy specified mla pkg'),
-          string(name: "COPY_N2A_COMPILER_BRANCH_PKG", defaultValue: currentBranchName, description: 'Copy specified n2a_compiler pkg')
+          booleanParam(
+              name: 'SKIP_N2A_COMPILER_BUILD',
+              description: 'Skips building n2a_compiler',
+              defaultValue: false
+          )
       ]),
   ])
 
@@ -20,9 +22,6 @@ def main() {
     def image
     stage("DockerBuild") {
       image = utils.dockerBuild("docker/Dockerfile", 'simaai/' + job_name, "docker_creds", "docker_build.log", { ->
-        utils.getPackage('sima-ai','mla', params.COPY_MLA_BRANCH_PKG, '*.deb')
-        utils.getPackage('sima-ai','n2a_compiler', params.COPY_N2A_COMPILER_BRANCH_PKG, '*.whl')
-        sh "ls -alh"
       })
     }
 
@@ -34,12 +33,14 @@ def main() {
       image["image"].inside("-m 32g -c 8") {
         utils.cmakeBuild("build", "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", {}, { src_dir ->
           stage("Python Bindings") {
-            sh """#!/bin/bash -ex
-cd ..
-make cython
-cd python
+            dir("../python") {
+              utils.setPythonBuildEnv([]) {
+                sh """#!/bin/bash -ex
+rm -rf dist build
 python3 setup.py bdist_wheel
 """
+              }
+            }
           }
         }, "../sima-regres.cmake", "clean all")
         stage("Package") {
@@ -48,9 +49,22 @@ python3 setup.py bdist_wheel
         }
       }
     }
+
+    stage("Promotion") {
+      if (env.BRANCH_NAME=="sima") {
+        utils.docker_promote(image['image'], 'docker_creds', '')
+      }
+    }
+
+  }
+
+  stage("Upstream") {
+    utils.buildUpstream("n2a_compiler", params.SKIP_N2A_COMPILER_BUILD, [])
   }
 }
 
 utils.job_wrapper( {
   main()
 })
+
+return this
