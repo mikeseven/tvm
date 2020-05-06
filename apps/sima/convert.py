@@ -154,12 +154,14 @@ if __name__ == '__main__':
 
     # make sure tensors are all in the right layout
     # TODO unfortunately, LRN layout is wrong and crashes the build???
-    with relay.build_config(opt_level=3):
-        _, _, params = relay.build(mod, target, host, params=params)
+    # with relay.build_config(opt_level=3):
+    #     _, _, params = relay.build(mod, target, host, params=params)
 
     t.update()
     t.set_postfix_str(f"Extract SiMa patterns.")
     mod = sima_patterns(mod['main'])
+
+    # print(mod)
 
     filename = args.out if args.out else os.path.join(model_path, model_name)
     t.update()
