@@ -76,4 +76,4 @@ def relay_viz(mod, graph_name, directory='.', format='svg'):
             raise RuntimeError(f'Unknown node type. node_idx: {node_idx}, node: {type(node)}')
 
     # print(dot.source)  # graphviz source
-    print(dot.render(filename=graph_name + '.gv', directory=directory, format=format))
+    dot.render(filename=graph_name + '.gv', directory=directory, format=format, quiet=True)

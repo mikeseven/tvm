@@ -164,7 +164,7 @@ def tvm_infer(graph, lib, params, input_var_name: str = 'data', data=None, ctx=t
     return output
 
 
-def simplify_graph(mod, params=None, target='llvm'):
+def simplify_graph(mod, params=None):
     """Simplify module for inference on MLA."""
     seq = tvm.transform.Sequential([relay.transform.RemoveUnusedFunctions(),
                                     relay.transform.InferType(),  # these next 4 remove BN
@@ -203,28 +203,27 @@ def simplify_graph(mod, params=None, target='llvm'):
     return mod
 
 
-def save_module(model_name, path, mod, graph=None, params=None, lib=None):
-    with open(os.path.join(path, f'{model_name}_ir.txt'), 'w') as outfile:
-        outfile.write(str(mod['main']))
+def save_module(model_name, mod, graph=None, params=None, lib=None):
+    with open(f"{model_name}_ir.txt", 'w') as f:
+        f.write(str(mod['main']))
 
     if graph:
-        with open(os.path.join(path, f"{model_name}_graph.json"), "w") as fo:
-            fo.write(graph)
+        with open(f"{model_name}_graph.json", "w") as f:
+            f.write(graph)
 
     if params:
-        with gzip.GzipFile(mode='wb', filename=os.path.join(path, f"{model_name}_params.gz")) as fo:
-            fo.write(relay.save_param_dict(params))
+        with gzip.GzipFile(mode='wb', filename=f"{model_name}_params.gz") as f:
+            f.write(relay.save_param_dict(params))
 
     if lib:
-        # lib.save(os.path.join(path, f"{model_name}_bin.o"))
-        lib.export_library(os.path.join(path, f"{model_name}_bin.so"))
+        lib.export_library(f"{model_name}_bin.so")
 
 
-def load_module(model_name, path, mod, params, lib=None):
-    loaded_json = open(os.path.join(path, f"{model_name}_deploy_graph.json")).read()
-    loaded_lib = tvm.runtime.load_module(os.path.join(path, f"{model_name}_deploy_lib.so"))
+def load_module(model_name, mod, params, lib=None):
+    loaded_json = open(f"{model_name}_graph.json").read()
+    loaded_lib = tvm.runtime.load_module(f"{model_name}_bin.so")
 
-    with gzip.GzipFile(mode='rb', filename=os.path.join(path, f"{model_name}_deploy_param.params.gz")) as fo:
-        loaded_params = bytearray(fo.read())
+    with gzip.GzipFile(mode='rb', filename=f"{model_name}_params.gz") as f:
+        loaded_params = bytearray(f.read())
 
     return loaded_json, loaded_lib, loaded_params
