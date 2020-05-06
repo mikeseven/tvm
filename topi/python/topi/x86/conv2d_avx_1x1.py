@@ -64,6 +64,8 @@ def _schedule_conv_NCHWc(s, cfg, data_vec, kernel_vec, conv_out, last):
     oh_factor, ow_factor = cfg["tile_oh"].val, cfg["tile_ow"].size[-1]
     _, _, _, _, ic_bn = get_const_tuple(data_vec.shape)
 
+    oc_bn = 1
+
     # schedule pad
     if isinstance(s[data_vec].op, tvm.te.ComputeOp) \
             and "pad" in data_vec.op.tag:

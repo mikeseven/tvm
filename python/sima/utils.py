@@ -76,19 +76,23 @@ def load_tf(model_path: str):
     return graph_def, graph
 
 
-def get_model_tf(model_path: str, input_shape=None, in_node: str = None, out_node: str = None, layout: str = 'NCHW'):
+def get_model_tf(model_path: str, in_node: str = None, in_shape=None, out_node: str = None, layout: str = 'NCHW'):
     """Load TF graph and converts it to Relay.
     """
     graph_def, graph = load_tf(model_path)
 
-    if in_node and input_shape and out_node:
+    if not out_node:
         mod, params = relay.frontend.from_tensorflow(graph_def,
                                                      layout=layout,
-                                                     shape={in_node: input_shape},
-                                                     outputs=[out_node])
+                                                     shape={in_node: in_shape})
+    elif not(in_node or in_shape):
+        mod, params = relay.frontend.from_tensorflow(graph_def)
     else:
         mod, params = relay.frontend.from_tensorflow(graph_def,
-                                                     layout=layout)
+                                                     layout=layout,
+                                                     shape={in_node: in_shape},
+                                                     outputs=[out_node])
+
     return mod, params, graph
 
 

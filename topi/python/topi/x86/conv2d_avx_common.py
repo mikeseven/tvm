@@ -85,6 +85,7 @@ def _schedule_conv_NCHWc(s, cfg, data_vec, kernel_vec, conv_out, last):
     # fetch schedule
     reg_n, unroll_kw = cfg["tile_ow"].size[-1], cfg["unroll_kw"].val
     _, _, _, _, ic_bn = get_const_tuple(data_vec.shape)
+    oc_bn = 1
 
     # schedule pad
     if isinstance(s[data_vec].op, tvm.te.ComputeOp) \

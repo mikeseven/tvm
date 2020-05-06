@@ -10,7 +10,7 @@ from tvm.contrib import graph_runtime as runtime
 from tvm.relay.testing import run_opt_pass
 
 from sima.relay_viz import relay_viz
-from sima.utils import get_model_tf, simplify_graph, save_module
+from sima.utils import get_model_tf, save_module
 import warnings
 from tqdm.auto import tqdm
 
@@ -59,10 +59,57 @@ def sima_patterns(func):
     return tvm.IRModule.from_expr(result)
 
 
+def simplify_graph(mod, params=None):
+    """Simplify module for inference on MLA."""
+    seq = tvm.transform.Sequential([relay.transform.RemoveUnusedFunctions(),
+                                    relay.transform.ConvertLayout('NCHW'),
+                                    relay.transform.InferType(),  # these next 4 remove BN
+                                    relay.transform.SimplifyInference(),
+                                    relay.transform.FoldConstant(),
+                                    relay.transform.FoldScaleAxis(),
+                                    relay.transform.EliminateCommonSubexpr(),
+                                    # relay.transform.FuseOps(fuse_opt_level=2)
+                                    ])
+
+    def _bind_params(func, params):
+        """Bind the params to the expression."""
+        name_dict = {}
+        for arg in func.params:
+            name = arg.name_hint
+            if name in name_dict:
+                name_dict[name] = None
+            else:
+                name_dict[name] = arg
+        bind_dict = {}
+        for k, v in params.items():
+            if k not in name_dict:
+                continue
+            arg = name_dict[k]
+            if arg is None:
+                raise ValueError("Multiple args in the function have name %s" % k)
+            bind_dict[arg] = relay.expr.const(v)
+        return relay.expr.bind(func, bind_dict)
+
+    if params:
+        mod['main'] = _bind_params(mod['main'], params)
+
+    with relay.build_config(opt_level=3):  # to make sure EliminateCommonSubexpr is executed (level 2)
+        mod = seq(mod)
+        # mod, params = relay.optimize(mod, target, params)
+
+    return mod
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--tf", type=str, default=None, required=True,
                         help='TensorFlow .pb model file')
+    parser.add_argument("--in_name", type=str, default=None,
+                        help="Input op name")
+    parser.add_argument("--in_shape", type=int, default=None, nargs='+',
+                        help="Input op shape e.g. 1 1024 2048 3 for TF NHWC layout")
+    parser.add_argument("--out_name", type=str, default=None,
+                        help="Output node name")
     parser.add_argument("--out", type=str, default=None,
                         help="Output file name")
     parser.add_argument("--viz", action='store_true',
@@ -86,32 +133,33 @@ if __name__ == '__main__':
 
     t = tqdm(total=3, unit="step", bar_format="{l_bar}{bar}|{rate_fmt}{postfix}")
     t.set_postfix_str(f"Loading {filename}")
-    mod, params, _ = get_model_tf(filename, layout="NHWC")  # TF models are always NHWC
+    mod, params, _ = get_model_tf(filename,
+                                  in_node=args.in_name,
+                                  in_shape=args.in_shape,
+                                  out_node=args.out_name,
+                                  layout="NHWC")  # TF models are always NHWC
     if not mod:
         print(f"ERROR: Could not load model in {filename}.")
         sys.exit(-1)
 
+    relay_viz(mod, "/Users/mikael/tmp_convert_orig", format='svg')
+
     t.update()
     t.set_postfix_str(f"Converting to TVM IR.")
 
-    host = "llvm -mcpu=core-avx2"
-    target = host
-
-    ctx = tvm.context(target)
-
-    # convert all ops' layout to NCHW for Sima compiler
-    func = run_opt_pass(mod['main'], relay.transform.ConvertLayout('NCHW'))
-    mod = tvm.IRModule.from_expr(func)
+    target = host = "llvm"
+    ctx = tvm.cpu()
 
     mod = simplify_graph(mod, params)
-    # print(mod)
+
+    # make sure tensors are all in the right layout
+    # TODO unfortunately, LRN layout is wrong and crashes the build???
+    with relay.build_config(opt_level=3):
+        _, _, params = relay.build(mod, target, host, params=params)
 
     t.update()
     t.set_postfix_str(f"Extract SiMa patterns.")
     mod = sima_patterns(mod['main'])
-
-    # with relay.build_config(opt_level=3):
-    #     graph, lib, params = relay.build(mod, target, host, params=params)
 
     filename = args.out if args.out else os.path.join(model_path, model_name)
     t.update()
