@@ -10,7 +10,8 @@ def main() {
               name: 'SKIP_N2A_COMPILER_BUILD',
               description: 'Skips building n2a_compiler',
               defaultValue: false
-          )
+          ),
+          booleanParam(name: "PACKAGE_ONLY", defaultValue: false, description: 'Only package don\'t run tests')
       ]),
   ])
 
@@ -59,7 +60,9 @@ python3 setup.py bdist_wheel
   }
 
   stage("Upstream") {
-    utils.buildUpstream("n2a_compiler", params.SKIP_N2A_COMPILER_BUILD, [])
+    utils.buildUpstream("n2a_compiler", params.SKIP_N2A_COMPILER_BUILD, [
+        booleanParam(name: 'PACKAGE_ONLY', value: params.PACKAGE_ONLY)
+    ])
   }
 }
 
