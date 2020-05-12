@@ -149,9 +149,43 @@ def get_package_data_files():
     # Relay standard libraries
     return ['relay/std/prelude.rly', 'relay/std/core.rly']
 
+import yaml
+import subprocess
+
+def get_version(pkg_dir, main_branch = "master"):
+  with open("VERSION.in") as fh:
+    vinfo = yaml.load(fh.read(), Loader=yaml.BaseLoader)
+    version = '.'.join([vinfo["major"], vinfo["minor"], vinfo["patch"]])
+
+  if 'GIT_HASH' in os.environ:
+    # In tox the .git directory is not available so do this instead
+    vinfo['git_hash'] = os.environ['GIT_HASH']
+  else:
+    proc = subprocess.Popen(['git','log','-1','--format=%h'], stdout=subprocess.PIPE)
+    proc.wait()
+    if proc.returncode != 0:
+      raise RuntimeError("ERROR: unable to execute git log")
+    vinfo['git_hash'] = proc.stdout.read().decode('utf-8').rstrip()
+
+  with open(pkg_dir + "/VERSION","w") as fh:
+    fh.write(yaml.dump(vinfo))
+
+  # This comes from Jenkins for upstream/downstream builds
+  if 'DEV_VERSION' in os.environ:
+    version = version + "+" + os.environ['DEV_VERSION']
+
+  return version
+
+
+def get_package(env, pkg_name, pkg_version):
+  if env in os.environ and os.environ[env] != "latest":
+    return "%s==%s+%s" % (pkg_name, pkg_version, os.environ[env])
+  else:
+    return "%s==%s" % (pkg_name, pkg_version)
+
 
 setup(name='sima-tvm',
-      version=__version__,
+      version=get_version('tvm', 'sima'),
       description="TVM: An End to End Tensor IR/DSL Stack for Deep Learning Systems",
       zip_safe=False,
       install_requires=[
@@ -173,7 +207,7 @@ setup(name='sima-tvm',
 
       packages=find_packages(),
       package_dir={'tvm': 'tvm'},
-      package_data={'tvm': get_package_data_files()},
+      package_data={'tvm': get_package_data_files() + ["VERSION"]},
       distclass=BinaryDistribution,
       url='https://github.com/apache/incubator-tvm',
       ext_modules=config_cython(),
