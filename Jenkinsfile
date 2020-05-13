@@ -35,12 +35,12 @@ def main() {
         utils.cmakeBuild("build", "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", {}, { src_dir ->
           stage("Python Bindings") {
             dir("../python") {
-              utils.setPythonBuildEnv([]) {
+              utils.setPythonBuildEnv([], {
                 sh """#!/bin/bash -ex
 rm -rf dist build
 python3 setup.py bdist_wheel
 """
-              }
+              }, 'sima')
             }
           }
         }, "../sima-regres.cmake", "clean all")
