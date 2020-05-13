@@ -10,7 +10,8 @@ def main() {
               name: 'SKIP_N2A_COMPILER_BUILD',
               description: 'Skips building n2a_compiler',
               defaultValue: false
-          )
+          ),
+          booleanParam(name: "PACKAGE_ONLY", defaultValue: false, description: 'Only package don\'t run tests')
       ]),
   ])
 
@@ -34,12 +35,12 @@ def main() {
         utils.cmakeBuild("build", "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", {}, { src_dir ->
           stage("Python Bindings") {
             dir("../python") {
-              utils.setPythonBuildEnv([]) {
+              utils.setPythonBuildEnv([], {
                 sh """#!/bin/bash -ex
 rm -rf dist build
 python3 setup.py bdist_wheel
 """
-              }
+              }, 'sima')
             }
           }
         }, "../sima-regres.cmake", "clean all")
@@ -59,7 +60,9 @@ python3 setup.py bdist_wheel
   }
 
   stage("Upstream") {
-    utils.buildUpstream("n2a_compiler", params.SKIP_N2A_COMPILER_BUILD, [])
+    utils.buildUpstream("n2a_compiler", params.SKIP_N2A_COMPILER_BUILD, [
+        booleanParam(name: 'PACKAGE_ONLY', value: params.PACKAGE_ONLY)
+    ])
   }
 }
 
