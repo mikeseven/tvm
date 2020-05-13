@@ -172,14 +172,14 @@ def get_version(pkg_dir, main_branch = "master"):
 
   # This comes from Jenkins for upstream/downstream builds
   if 'DEV_VERSION' in os.environ:
-    version = version + "-" + os.environ['DEV_VERSION']
+    version = version + ".dev0+" + os.environ['DEV_VERSION']
 
   return version
 
 
 def get_package(env, pkg_name, pkg_version):
   if env in os.environ and os.environ[env] != "latest":
-    return "%s==%s-%s" % (pkg_name, pkg_version, os.environ[env])
+    return "%s==%s.dev0+%s" % (pkg_name, pkg_version, os.environ[env])
   else:
     return "%s==%s" % (pkg_name, pkg_version)
 
