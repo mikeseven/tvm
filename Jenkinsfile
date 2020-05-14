@@ -43,16 +43,17 @@ python3 setup.py bdist_wheel
               }, 'sima')
             }
             dir("${env.WORKSPACE}/topi/python") {
-              utils.setPythonBuildEnv([]) {
+              utils.setPythonBuildEnv([], {
                 sh """#!/bin/bash -ex
+rm -rf dist build
 python3 setup.py bdist_wheel
 """
-              }
+              }, 'sima')
             }
           }
         }, "../sima-regres.cmake", "clean all")
         stage("Package") {
-          tvm_pkg_dir = "python/dist/*whl"
+          tvm_pkg_dir = "python/dist/*.whl"
           archiveArtifacts(tvm_pkg_dir)
           utils.uploadPythonPackages('jenkins_user', 'sima-pypi', tvm_pkg_dir, 3)
           topi_pkg_dir = "topi/python/dist/*.whl"
