@@ -183,9 +183,10 @@ def get_package(env, pkg_name, pkg_version):
   else:
     return "%s==%s" % (pkg_name, pkg_version)
 
+tvm_version = get_version('tvm', 'sima')
 
 setup(name='sima-tvm',
-      version=get_version('tvm', 'sima'),
+      version=tvm_version,
       description="TVM: An End to End Tensor IR/DSL Stack for Deep Learning Systems",
       zip_safe=False,
       install_requires=[
@@ -194,6 +195,7 @@ setup(name='sima-tvm',
         'decorator',
         'attrs',
         'psutil',
+        'sima-topi==' + tvm_version,
         'sima-mlc'
         ],
       extras_require={'test': ['pillow<7',

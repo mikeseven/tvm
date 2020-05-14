@@ -26,7 +26,7 @@ RUN apt-get update && \
     libopenblas-dev \
     cython && \
   rm -rf /var/lib/apt/lists/* && \
-  pip3 install twine && \
+  pip3 install twine pyyaml && \
   pip3 install --upgrade keyrings.alt
 
 

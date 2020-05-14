@@ -34,7 +34,7 @@ def main() {
       image["image"].inside("-m 32g -c 8") {
         utils.cmakeBuild("build", "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", {}, { src_dir ->
           stage("Python Bindings") {
-            dir("../python") {
+            dir("${env.WORKSPACE}/python") {
               utils.setPythonBuildEnv([], {
                 sh """#!/bin/bash -ex
 rm -rf dist build
@@ -42,11 +42,22 @@ python3 setup.py bdist_wheel
 """
               }, 'sima')
             }
+            dir("${env.WORKSPACE}/topi/python") {
+              utils.setPythonBuildEnv([]) {
+                sh """#!/bin/bash -ex
+python3 setup.py bdist_wheel
+"""
+              }
+            }
           }
         }, "../sima-regres.cmake", "clean all")
         stage("Package") {
-          archiveArtifacts('python/dist/*.whl')
-          utils.uploadPythonPackages('jenkins_user', 'sima-pypi', 'python/dist/*.whl', 3)
+          tvm_pkg_dir = "python/dist/*whl"
+          archiveArtifacts(tvm_pkg_dir)
+          utils.uploadPythonPackages('jenkins_user', 'sima-pypi', tvm_pkg_dir, 3)
+          topi_pkg_dir = "topi/python/dist/*.whl"
+          archiveArtifacts(topi_pkg_dir)
+          utils.uploadPythonPackages('jenkins_user', 'sima-pypi', topi_pkg_dir, 3)
         }
       }
     }

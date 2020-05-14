@@ -21,6 +21,8 @@ from __future__ import absolute_import
 import os
 import shutil
 import sys
+import yaml
+import subprocess
 
 from setuptools import find_packages
 from setuptools.dist import Distribution
@@ -67,6 +69,30 @@ def get_lib_path():
 
 LIB_LIST, __version__ = get_lib_path()
 
+def get_version(pkg_dir, main_branch = "master"):
+  with open("VERSION.in") as fh:
+    vinfo = yaml.load(fh.read(), Loader=yaml.BaseLoader)
+    version = '.'.join([vinfo["major"], vinfo["minor"], vinfo["patch"]])
+
+  if 'GIT_HASH' in os.environ:
+    # In tox the .git directory is not available so do this instead
+    vinfo['git_hash'] = os.environ['GIT_HASH']
+  else:
+    proc = subprocess.Popen(['git','log','-1','--format=%h'], stdout=subprocess.PIPE)
+    proc.wait()
+    if proc.returncode != 0:
+      raise RuntimeError("ERROR: unable to execute git log")
+    vinfo['git_hash'] = proc.stdout.read().decode('utf-8').rstrip()
+
+  with open(pkg_dir + "/VERSION","w") as fh:
+    fh.write(yaml.dump(vinfo))
+
+  # This comes from Jenkins for upstream/downstream builds
+  if 'DEV_VERSION' in os.environ:
+    version = version + ".dev0+" + os.environ['DEV_VERSION']
+
+  return version
+
 if not os.getenv('CONDA_BUILD'):
     curr_path = os.path.dirname(os.path.abspath(os.path.expanduser(__file__)))
     for i, path in enumerate(LIB_LIST):
@@ -107,8 +133,8 @@ if include_libs:
         "data_files": [('topi', LIB_LIST)]
     }
 
-setup(name='topi',
-      version=__version__,
+setup(name='sima-topi',
+      version=get_version('topi', 'sima'),
       description="TOPI: TVM operator index",
       install_requires=[
           "numpy",
