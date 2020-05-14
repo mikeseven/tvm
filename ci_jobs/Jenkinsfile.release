@@ -1,0 +1,54 @@
+#!/usr/bin/env groovy
+library('sima-jenkins-lib')
+
+def main() {
+  def job_name = env.JOB_NAME.split('/')[1]
+  def image
+
+  currentBuild.result = "SUCCESS"
+
+  node('docker') {
+    stage("Checkout"){
+      utils.checkoutBitbucket()
+    }
+
+    timeout(120) {
+      stage("Docker Pull") {
+        docker.withRegistry('', 'docker_creds') {
+          image = docker.image("simaai/n2a_compiler:latest")
+          image.pull()
+        }
+      }
+    }
+    timeout(120) {
+      image.inside("-m 32g --cpus=8") {
+        stage("Download Package") {
+          utils.record('download.log', {
+            sh "rm -rf *.whl"
+          
+            tvm_pkg_name = "sima-tvm"
+            vinfo = readYaml file: "${env.WORKSPACE}/python/VERSION.in"
+            tvm_version = vinfo['major'] + "." + vinfo['minor'] + "." + vinfo['patch']
+
+            utils.downloadPythonPackage('jenkins_user', 'sima-pypi', tvm_pkg_name + "===" + tvm_version, 3)
+            sh "ls -alh"
+          }, true)
+        }
+
+        stage("Validate Package") {
+          //TODO: run tests on the package
+        }
+
+        stage("Promote Package(Staging)") {
+          utils.record('upload.log', {
+            utils.uploadPythonPackages('jenkins_user', 'sima-staging', '*.whl', 3)
+          }, true)
+        }
+      } // docker
+    } // timeout
+  } // node
+} // main
+
+utils.job_wrapper({
+  main()
+}, 240)
