@@ -24,6 +24,7 @@ RUN \
 RUN apt-get update && \
   apt-get install -y \
     libopenblas-dev \
+    antlr4 \
     cython && \
   rm -rf /var/lib/apt/lists/* && \
   pip3 install twine && \

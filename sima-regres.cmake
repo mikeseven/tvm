@@ -168,7 +168,7 @@ set(USE_SORT ON)
 # - ON: enable ANTLR by searching default locations (cmake find_program for antlr4 and /usr/local for jar)
 # - OFF: disable ANTLR
 # - /path/to/antlr-*-complete.jar: path to specific ANTLR jar file
-set(USE_ANTLR OFF)
+set(USE_ANTLR ON)
 
 # Whether use Relay debug mode
 set(USE_RELAY_DEBUG ON)
