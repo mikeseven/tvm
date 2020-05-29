@@ -18,12 +18,12 @@ def main() {
   node("docker") {
     stage("Checkout") {
       utils.checkoutBitbucket()
+      utils.setBuildMetadataFromVersionIn("python/VERSION.in")
     }
 
     def image
     stage("DockerBuild") {
-      image = utils.dockerBuild("docker/Dockerfile", 'simaai/' + job_name, "docker_creds", "docker_build.log", { ->
-      })
+      image = utils.dockerBuild("docker/Dockerfile", 'simaai/' + job_name, "docker_creds", "docker_build.log", {})
     }
 
     parallel push: {
