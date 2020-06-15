@@ -18,6 +18,7 @@ def main() {
   node("docker") {
     stage("Checkout") {
       utils.checkoutBitbucket()
+      utils.setBuildMetadataFromVersionIn("python/VERSION.in")
     }
 
     def image

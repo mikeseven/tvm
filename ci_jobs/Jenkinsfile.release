@@ -31,6 +31,13 @@ def main() {
             tvm_version = vinfo['major'] + "." + vinfo['minor'] + "." + vinfo['patch']
 
             utils.downloadPythonPackage('jenkins_user', 'sima-pypi', tvm_pkg_name + "===" + tvm_version, 3)
+
+            topi_pkg_name = "sima-topi"
+            vinfo = readYaml file: "${env.WORKSPACE}/topi/python/VERSION.in"
+            topi_version = vinfo['major'] + "." + vinfo['minor'] + "." + vinfo['patch']
+
+            utils.downloadPythonPackage('jenkins_user', 'sima-pypi', topi_pkg_name + "===" + topi_version, 3)
+
             sh "ls -alh"
           }, true)
         }
