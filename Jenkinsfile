@@ -1,5 +1,5 @@
 #!groovy
-library('sima-jenkins-lib')
+library('sima-jenkins-lib@SIM-3034')
 
 def main() {
   def job_name = env.JOB_NAME.split('/')[1]
@@ -23,9 +23,10 @@ def main() {
 
     def image
     stage("DockerBuild") {
-      image = utils.dockerBuild("docker/Dockerfile",
-          "${env.NEXUS_URL}:5000" + job_name,
-          "jenkins_user",
+      image = utils.dockerBuild(
+          "docker/Dockerfile",
+          'simaai/' + job_name,
+          "docker_creds",
           "docker_build.log", 
           {},
           "https://${env.NEXUS_URL}:5000"
