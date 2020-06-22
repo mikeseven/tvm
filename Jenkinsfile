@@ -25,8 +25,8 @@ def main() {
     stage("DockerBuild") {
       image = utils.dockerBuild(
           "docker/Dockerfile",
-          'simaai/' + job_name,
-          "docker_creds",
+          "${env.NEXUS_URL}:5000/" + job_name,
+          "jenkins_user",
           "docker_build.log", 
           {},
           "https://${env.NEXUS_URL}:5000"
