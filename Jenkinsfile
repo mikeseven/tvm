@@ -1,5 +1,5 @@
 #!groovy
-library('sima-jenkins-lib@SIM-3034')
+library('sima-jenkins-lib')
 
 def main() {
   def job_name = env.JOB_NAME.split('/')[1]
