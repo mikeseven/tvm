@@ -23,7 +23,14 @@ def main() {
 
     def image
     stage("DockerBuild") {
-      image = utils.dockerBuild("docker/Dockerfile", 'simaai/' + job_name, "docker_creds", "docker_build.log", {})
+      image = utils.dockerBuild(
+          "docker/Dockerfile",
+          "${env.NEXUS_URL}:5000/" + job_name,
+          "jenkins_user",
+          "docker_build.log", 
+          {},
+          "https://${env.NEXUS_URL}:5000"
+      )
     }
 
     parallel push: {
@@ -65,7 +72,7 @@ python3 setup.py bdist_wheel
 
     stage("Promotion") {
       if (env.BRANCH_NAME=="sima") {
-        utils.docker_promote(image['image'], 'docker_creds', '')
+        utils.docker_promote(image['image'], 'jenkins_user', "https://${env.NEXUS_URL}:5000")
       }
     }
 

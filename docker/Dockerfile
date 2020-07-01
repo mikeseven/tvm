@@ -1,4 +1,4 @@
-FROM simaai/ubuntu:latest
+FROM nexus.dev.sima.ai:5000/ubuntu:latest
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get -y install \
