@@ -7,11 +7,15 @@ def main() {
   properties([
       parameters([
           booleanParam(
-              name: 'SKIP_N2A_COMPILER_BUILD',
-              description: 'Skips building n2a_compiler',
+              name: 'SKIP_DOWNSTREAM_BUILDS',
+              description: 'Skips building upstream jobs',
               defaultValue: false
           ),
-          booleanParam(name: "PACKAGE_ONLY", defaultValue: false, description: 'Only package don\'t run tests')
+          booleanParam(
+              name: "PACKAGE_ONLY",
+              defaultValue: false,
+              description: 'Only package don\'t run tests'
+          )
       ]),
   ])
 
@@ -79,9 +83,13 @@ python3 setup.py bdist_wheel
   }
 
   stage("Upstream") {
-    utils.buildUpstream("n2a_compiler", params.SKIP_N2A_COMPILER_BUILD, [
-        booleanParam(name: 'PACKAGE_ONLY', value: params.PACKAGE_ONLY)
-    ])
+    parallel n2a: {
+      utils.buildUpstream("n2a_compiler", params.SKIP_DOWNSTREAM_BUILDS, [
+          booleanParam(name: 'PACKAGE_ONLY', value: params.PACKAGE_ONLY)
+      ])
+    }, psim_mla_flow: {
+      utils.buildUpstream("psim_mla_flow", params.SKIP_UPSTREAM_BUILDS, [])
+    }
   }
 }
 
