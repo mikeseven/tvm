@@ -195,8 +195,7 @@ setup(name='sima-tvm',
         'decorator',
         'attrs',
         'psutil',
-        'sima-topi==' + tvm_version,
-        'sima-mlc'
+        'sima-topi==' + tvm_version
         ],
       extras_require={'test': ['pillow<7',
                                'matplotlib'],
