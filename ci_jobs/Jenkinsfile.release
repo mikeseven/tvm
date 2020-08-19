@@ -1,6 +1,8 @@
 #!/usr/bin/env groovy
 library('sima-jenkins-lib')
 
+DOCKER_OPTS = '-m 32g --cpus 8 -v /jenkins/workspace/ref_repos:/jenkins/workspace/ref_repos:rw,z'
+
 def main() {
   def job_name = env.JOB_NAME.split('/')[1]
   def image
@@ -21,11 +23,11 @@ def main() {
       }
     }
     timeout(120) {
-      image.inside("-m 32g --cpus=8") {
+      image.inside(DOCKER_OPTS) {
         stage("Download Package") {
           utils.record('download.log', {
             sh "rm -rf *.whl"
-          
+
             tvm_pkg_name = "sima-tvm"
             vinfo = readYaml file: "${env.WORKSPACE}/python/VERSION.in"
             tvm_version = vinfo['major'] + "." + vinfo['minor'] + "." + vinfo['patch']
