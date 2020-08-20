@@ -1,6 +1,8 @@
 #!groovy
 library('sima-jenkins-lib')
 
+DOCKER_OPTS = '-m 32g --cpus 8 -v /jenkins/workspace/ref_repos:/jenkins/workspace/ref_repos:rw,z'
+
 def main() {
   def job_name = env.JOB_NAME.split('/')[1]
 
@@ -42,7 +44,7 @@ def main() {
         image['post']()
       }
     }, build: {
-      image["image"].inside("-m 32g -c 8") {
+      image["image"].inside(DOCKER_OPTS) {
         utils.cmakeBuild("build", "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", {}, { src_dir ->
           stage("Python Bindings") {
             dir("${env.WORKSPACE}/python") {
