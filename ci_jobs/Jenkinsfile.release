@@ -1,63 +1,135 @@
-#!/usr/bin/env groovy
+#!groovy
 library('sima-jenkins-lib')
 
 DOCKER_OPTS = '-m 32g --cpus 8 -v /jenkins/workspace/ref_repos:/jenkins/workspace/ref_repos:rw,z'
+NEXUS_DOCKER_DEV = "https://${env.NEXUS_URL}:5000"
+NEXUS_DOCKER_STAGING = "https://${env.NEXUS_URL}:5300"
 
-def main() {
-  def job_name = env.JOB_NAME.split('/')[1]
-  def image
+/* promote - promote artifacts to staging repo on tagged builds
+ * 
+ */
+def promote(dev_image) {
+  if (utils.isTagBuild()) {
+    node('docker') {
+      docker.withRegistry(NEXUS_DOCKER_DEV, "jenkins_user") {
+        dev_image["image"].pull()
+        dev_image["image"].inside(DOCKER_OPTS) {
+          utils.installNexusCreds('jenkins_user')
 
-  currentBuild.result = "SUCCESS"
-
-  node('docker') {
-    stage("Checkout"){
-      utils.checkoutBitbucket()
-    }
-
-    timeout(120) {
-      stage("Docker Pull") {
-        docker.withRegistry('', 'docker_creds') {
-          image = docker.image("simaai/n2a_compiler:latest")
-          image.pull()
+          stage("Promote") {
+            unstash('dist')
+            utils.uploadPythonPackages('jenkins_user', 'sima-staging', 'python/dist/*.whl')
+            utils.uploadPythonPackages('jenkins_user', 'sima-staging', 'python/topi/dist/*.whl')
+          }
         }
       }
     }
-    timeout(120) {
-      image.inside(DOCKER_OPTS) {
-        stage("Download Package") {
-          utils.record('download.log', {
-            sh "rm -rf *.whl"
+  }
+}
 
-            tvm_pkg_name = "sima-tvm"
-            vinfo = readYaml file: "${env.WORKSPACE}/python/VERSION.in"
-            tvm_version = vinfo['major'] + "." + vinfo['minor'] + "." + vinfo['patch']
+def main() {
+  def job_name = env.JOB_NAME.split('/')[1]
 
-            utils.downloadPythonPackage('jenkins_user', 'sima-pypi', tvm_pkg_name + "===" + tvm_version, 3)
+  properties([
+      parameters([
+          booleanParam(
+              name: 'SKIP_DOWNSTREAM_BUILDS',
+              description: 'Skips building upstream jobs',
+              defaultValue: utils.isTagBuild()
+          ),
+          booleanParam(
+              name: "PACKAGE_ONLY",
+              defaultValue: utils.isTagBuild(),
+              description: 'Only package don\'t run tests'
+          )
+      ]),
+  ])
 
-            topi_pkg_name = "sima-topi"
-            vinfo = readYaml file: "${env.WORKSPACE}/topi/python/VERSION.in"
-            topi_version = vinfo['major'] + "." + vinfo['minor'] + "." + vinfo['patch']
+  node("docker") {
+    stage("Checkout") {
+      utils.checkoutBitbucket()
+      utils.setBuildMetadataFromVersionIn("python/VERSION.in")
+    }
 
-            utils.downloadPythonPackage('jenkins_user', 'sima-pypi', topi_pkg_name + "===" + topi_version, 3)
+    def image
+    stage("DockerBuild") {
+      image = utils.dockerBuild(
+          "docker/Dockerfile",
+          "${env.NEXUS_URL}:5000/" + job_name,
+          "jenkins_user",
+          "docker_build.log", 
+          {},
+          "https://${env.NEXUS_URL}:5000"
+      )
+    }
 
-            sh "ls -alh"
-          }, true)
+    parallel push: {
+      stage("DockerPush") {
+        image['post']()
+      }
+    }, build: {
+      image["image"].inside(DOCKER_OPTS) {
+        utils.cmakeBuild("build", "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache", {}, { src_dir ->
+          stage("Python Bindings") {
+            dir("${env.WORKSPACE}/python") {
+              utils.setPythonBuildEnv([], {
+                sh """#!/bin/bash -ex
+rm -rf dist build
+python3 setup.py bdist_wheel
+"""
+              }, 'sima')
+            }
+            dir("${env.WORKSPACE}/topi/python") {
+              utils.setPythonBuildEnv([], {
+                sh """#!/bin/bash -ex
+rm -rf dist build
+python3 setup.py bdist_wheel
+"""
+              }, 'sima')
+            }
+            dir("${env.WORKSPACE}") {
+              stash(name: 'dist', includes: 'python/dist/*.whl, python/topi/dist/*.whl')
+            }
+          }
+        }, "../sima-regres.cmake", "clean all")
+        stage("Package") {
+          tvm_pkg_dir = "python/dist/*.whl"
+          archiveArtifacts(tvm_pkg_dir)
+          utils.uploadPythonPackages('jenkins_user', 'sima-pypi', tvm_pkg_dir, 3)
+          topi_pkg_dir = "topi/python/dist/*.whl"
+          archiveArtifacts(topi_pkg_dir)
+          utils.uploadPythonPackages('jenkins_user', 'sima-pypi', topi_pkg_dir, 3)
         }
+      }
+    }
 
-        stage("Validate Package") {
-          //TODO: run tests on the package
-        }
+    stage("Promotion") {
+      if (env.BRANCH_NAME=="sima") {
+        utils.docker_promote(image['image'], 'jenkins_user', "https://${env.NEXUS_URL}:5000")
+      }
+    }
 
-        stage("Promote Package(Staging)") {
-          utils.record('upload.log', {
-            utils.uploadPythonPackages('jenkins_user', 'sima-staging', '*.whl', 3)
-          }, true)
-        }
-      } // docker
-    } // timeout
-  } // node
-} // main
+  }
 
-utils.job_wrapper({
+  stage("Upstream") {
+    parallel n2a: {
+      utils.buildUpstream("n2a_compiler", params.SKIP_DOWNSTREAM_BUILDS, [
+          booleanParam(name: 'PACKAGE_ONLY', value: params.PACKAGE_ONLY)
+      ])
+    }, psim_mla_flow: {
+      utils.buildUpstream("psim_mla_flow", params.SKIP_DOWNSTREAM_BUILDS, [
+          booleanParam(name: 'PACKAGE_ONLY', value: params.PACKAGE_ONLY)
+      ])
+    }
+  }
+
+  stage('Promote') {
+    promote(image)
+  }
+}
+
+utils.job_wrapper( {
   main()
-}, 240)
+})
+
+return this

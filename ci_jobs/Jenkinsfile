@@ -2,6 +2,30 @@
 library('sima-jenkins-lib')
 
 DOCKER_OPTS = '-m 32g --cpus 8 -v /jenkins/workspace/ref_repos:/jenkins/workspace/ref_repos:rw,z'
+NEXUS_DOCKER_DEV = "https://${env.NEXUS_URL}:5000"
+NEXUS_DOCKER_STAGING = "https://${env.NEXUS_URL}:5300"
+
+/* promote - promote artifacts to staging repo on tagged builds
+ * 
+ */
+def promote(dev_image) {
+  if (utils.isTagBuild()) {
+    node('docker') {
+      docker.withRegistry(NEXUS_DOCKER_DEV, "jenkins_user") {
+        dev_image["image"].pull()
+        dev_image["image"].inside(DOCKER_OPTS) {
+          utils.installNexusCreds('jenkins_user')
+
+          stage("Promote") {
+            unstash('dist')
+            utils.uploadPythonPackages('jenkins_user', 'sima-staging', 'python/dist/*.whl')
+            utils.uploadPythonPackages('jenkins_user', 'sima-staging', 'python/topi/dist/*.whl')
+          }
+        }
+      }
+    }
+  }
+}
 
 def main() {
   def job_name = env.JOB_NAME.split('/')[1]
@@ -11,11 +35,11 @@ def main() {
           booleanParam(
               name: 'SKIP_DOWNSTREAM_BUILDS',
               description: 'Skips building upstream jobs',
-              defaultValue: false
+              defaultValue: utils.isTagBuild()
           ),
           booleanParam(
               name: "PACKAGE_ONLY",
-              defaultValue: false,
+              defaultValue: utils.isTagBuild(),
               description: 'Only package don\'t run tests'
           )
       ]),
@@ -63,6 +87,9 @@ python3 setup.py bdist_wheel
 """
               }, 'sima')
             }
+            dir("${env.WORKSPACE}") {
+              stash(name: 'dist', includes: 'python/dist/*.whl, python/topi/dist/*.whl')
+            }
           }
         }, "../sima-regres.cmake", "clean all")
         stage("Package") {
@@ -90,8 +117,14 @@ python3 setup.py bdist_wheel
           booleanParam(name: 'PACKAGE_ONLY', value: params.PACKAGE_ONLY)
       ])
     }, psim_mla_flow: {
-      utils.buildUpstream("psim_mla_flow", params.SKIP_UPSTREAM_BUILDS, [])
+      utils.buildUpstream("psim_mla_flow", params.SKIP_DOWNSTREAM_BUILDS, [
+          booleanParam(name: 'PACKAGE_ONLY', value: params.PACKAGE_ONLY)
+      ])
     }
+  }
+
+  stage('Promote') {
+    promote(image)
   }
 }
 
